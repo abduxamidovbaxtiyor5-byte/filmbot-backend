@@ -1,0 +1,2895 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <meta name="theme-color" content="#0f0f0f">
+
+    <title>Кинотеатр</title>
+
+    <!-- Telegram Mini App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Kinobox -->
+    <script src="https://kinobox.tv/kinobox.min.js"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Arial,
+                sans-serif;
+
+            background:
+                var(--tg-theme-bg-color, #0f0f0f);
+
+            color:
+                var(--tg-theme-text-color, #ffffff);
+
+            overflow: hidden;
+        }
+
+        /* =====================================================
+           APP
+        ===================================================== */
+
+        .app {
+            width: 100%;
+            height: 100vh;
+
+            display: flex;
+            flex-direction: column;
+
+            background: #0f0f0f;
+        }
+
+        /* =====================================================
+           PLAYER
+        ===================================================== */
+
+        .player-section {
+
+            width: 100%;
+
+            height: 45vh;
+            min-height: 250px;
+
+            background: #000;
+
+            position: relative;
+
+            flex-shrink: 0;
+
+            overflow: hidden;
+        }
+
+        .kinobox_player {
+
+            width: 100%;
+            height: 100%;
+
+            background: #000;
+        }
+
+        .kinobox_player iframe {
+
+            width: 100% !important;
+            height: 100% !important;
+
+            border: 0 !important;
+
+            display: block;
+        }
+
+        /* Player loading */
+
+        .player-loading {
+
+            position: absolute;
+
+            inset: 0;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            background: #000;
+
+            color: #aaa;
+
+            font-size: 14px;
+
+            z-index: 5;
+
+            pointer-events: none;
+
+            transition:
+                opacity 0.3s ease;
+        }
+
+        .player-loading.hidden {
+
+            opacity: 0;
+        }
+
+        .spinner {
+
+            width: 24px;
+            height: 24px;
+
+            border: 3px solid #333;
+            border-top-color: #2481cc;
+
+            border-radius: 50%;
+
+            animation:
+                spin 0.8s linear infinite;
+
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* =====================================================
+           ROOM HEADER
+        ===================================================== */
+
+        .room-header {
+
+            height: 48px;
+
+            padding:
+                7px
+                10px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 8px;
+
+            background: #181818;
+
+            border-bottom:
+                1px solid #292929;
+
+            flex-shrink: 0;
+        }
+
+        .room-info {
+
+            min-width: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 2px;
+        }
+
+        .room-title {
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+        .room-status {
+
+            font-size: 10px;
+
+            color: #4ade80;
+        }
+
+        .room-status.offline {
+
+            color: #ef4444;
+        }
+
+        .room-status.connecting {
+
+            color: #facc15;
+        }
+
+        .invite-btn {
+
+            background: #2481cc;
+
+            color: white;
+
+            border: 0;
+
+            border-radius: 7px;
+
+            padding:
+                7px
+                10px;
+
+            font-size: 11px;
+
+            font-weight: 600;
+
+            cursor: pointer;
+
+            flex-shrink: 0;
+        }
+
+        .invite-btn:active {
+
+            transform: scale(0.97);
+        }
+
+        /* =====================================================
+           CHAT
+        ===================================================== */
+
+        .chat-section {
+
+            flex: 1;
+
+            min-height: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            background: #181818;
+        }
+
+        .chat-messages {
+
+            flex: 1;
+
+            min-height: 0;
+
+            overflow-y: auto;
+
+            padding:
+                10px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 6px;
+
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .msg {
+
+            max-width: 90%;
+
+            background: #252525;
+
+            padding:
+                7px
+                10px;
+
+            border-radius: 8px;
+
+            font-size: 12px;
+
+            line-height: 1.35;
+
+            word-break: break-word;
+
+            align-self: flex-start;
+        }
+
+        .msg.mine {
+
+            align-self: flex-end;
+
+            background: #1d4f73;
+        }
+
+        .msg.system {
+
+            max-width: 100%;
+
+            width: 100%;
+
+            background:
+                rgba(36, 129, 204, 0.13);
+
+            color: #60a5fa;
+
+            text-align: center;
+
+            font-size: 11px;
+        }
+
+        .msg-user {
+
+            font-weight: 700;
+
+            color: #60a5fa;
+
+            margin-right: 4px;
+        }
+
+        /* =====================================================
+           INPUT
+        ===================================================== */
+
+        .chat-input-box {
+
+            display: flex;
+
+            gap: 6px;
+
+            padding:
+                8px
+                10px;
+
+            background: #151515;
+
+            border-top:
+                1px solid #292929;
+
+            flex-shrink: 0;
+
+            padding-bottom:
+                max(8px, env(safe-area-inset-bottom));
+        }
+
+        .message-input {
+
+            flex: 1;
+
+            min-width: 0;
+
+            height: 38px;
+
+            background: #222;
+
+            color: #fff;
+
+            border:
+                1px solid #3b3b3b;
+
+            border-radius: 8px;
+
+            outline: none;
+
+            padding:
+                0
+                11px;
+
+            font-size: 13px;
+        }
+
+        .message-input:focus {
+
+            border-color: #2481cc;
+        }
+
+        .send-btn {
+
+            width: 64px;
+
+            height: 38px;
+
+            border: 0;
+
+            border-radius: 8px;
+
+            background: #2481cc;
+
+            color: white;
+
+            font-size: 12px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+        .send-btn:active {
+
+            transform: scale(0.97);
+        }
+
+        .send-btn:disabled {
+
+            opacity: 0.5;
+
+            cursor: default;
+        }
+
+        /* =====================================================
+           SEARCH OVERLAY
+        ===================================================== */
+
+        .search-overlay {
+
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 100;
+
+            background:
+                rgba(0, 0, 0, 0.88);
+
+            display: none;
+
+            flex-direction: column;
+        }
+
+        .search-overlay.active {
+
+            display: flex;
+        }
+
+        .search-header {
+
+            padding:
+                12px;
+
+            display: flex;
+
+            gap: 8px;
+
+            background: #151515;
+
+            border-bottom:
+                1px solid #2a2a2a;
+        }
+
+        .search-input {
+
+            flex: 1;
+
+            height: 42px;
+
+            border:
+                1px solid #444;
+
+            border-radius: 8px;
+
+            background: #222;
+
+            color: #fff;
+
+            outline: none;
+
+            padding:
+                0
+                12px;
+
+            font-size: 14px;
+        }
+
+        .search-close {
+
+            width: 42px;
+
+            border: 0;
+
+            border-radius: 8px;
+
+            background: #333;
+
+            color: white;
+
+            font-size: 18px;
+        }
+
+        .search-results {
+
+            flex: 1;
+
+            overflow-y: auto;
+
+            padding: 10px;
+        }
+
+        .movie-card {
+
+            display: flex;
+
+            gap: 10px;
+
+            padding: 9px;
+
+            margin-bottom: 7px;
+
+            background: #202020;
+
+            border-radius: 9px;
+
+            cursor: pointer;
+        }
+
+        .movie-card:active {
+
+            background: #2c2c2c;
+        }
+
+        .movie-poster {
+
+            width: 55px;
+
+            height: 78px;
+
+            object-fit: cover;
+
+            border-radius: 6px;
+
+            background: #333;
+
+            flex-shrink: 0;
+        }
+
+        .movie-info {
+
+            min-width: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: center;
+
+            gap: 5px;
+        }
+
+        .movie-title {
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            line-height: 1.25;
+        }
+
+        .movie-year {
+
+            font-size: 11px;
+
+            color: #999;
+        }
+
+        .search-empty {
+
+            text-align: center;
+
+            color: #888;
+
+            padding: 30px 10px;
+
+            font-size: 13px;
+        }
+
+        /* =====================================================
+           SEARCH BUTTON
+        ===================================================== */
+
+        .floating-search {
+
+            position: absolute;
+
+            right: 10px;
+
+            top: 10px;
+
+            z-index: 10;
+
+            border: 0;
+
+            border-radius: 50%;
+
+            width: 40px;
+
+            height: 40px;
+
+            background:
+                rgba(20, 20, 20, 0.82);
+
+            color: white;
+
+            font-size: 18px;
+
+            display: none;
+        }
+
+        /* =====================================================
+           TOAST
+        ===================================================== */
+
+        .toast {
+
+            position: fixed;
+
+            left: 50%;
+
+            bottom: 75px;
+
+            transform:
+                translateX(-50%)
+                translateY(20px);
+
+            background:
+                rgba(20, 20, 20, 0.95);
+
+            color: white;
+
+            padding:
+                9px
+                14px;
+
+            border-radius: 8px;
+
+            font-size: 12px;
+
+            opacity: 0;
+
+            pointer-events: none;
+
+            transition:
+                all 0.25s ease;
+
+            z-index: 300;
+
+            max-width: 90%;
+
+            text-align: center;
+        }
+
+        .toast.show {
+
+            opacity: 1;
+
+            transform:
+                translateX(-50%)
+                translateY(0);
+        }
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 500px) {
+
+            .player-section {
+
+                height: 38vh;
+
+                min-height: 210px;
+            }
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+<div class="app">
+
+    <!-- =====================================================
+         PLAYER
+    ====================================================== -->
+
+    <div class="player-section">
+
+        <div
+            class="kinobox_player"
+            id="kinoboxPlayer"
+        ></div>
+
+        <div
+            class="player-loading"
+            id="playerLoading"
+        >
+            <div class="spinner"></div>
+            <span>Загрузка плеера...</span>
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         ROOM HEADER
+    ====================================================== -->
+
+    <div class="room-header">
+
+        <div class="room-info">
+
+            <div
+                class="room-title"
+                id="roomTitle"
+            >
+                🎬 Кинотеатр
+            </div>
+
+            <div
+                class="room-status"
+                id="roomStatus"
+            >
+                Одиночный просмотр
+            </div>
+
+        </div>
+
+
+        <button
+            class="invite-btn"
+            id="inviteBtn"
+            onclick="inviteFriend()"
+            style="display:none;"
+        >
+            👥 Пригласить
+        </button>
+
+    </div>
+
+
+    <!-- =====================================================
+         CHAT
+    ====================================================== -->
+
+    <div class="chat-section">
+
+        <div
+            class="chat-messages"
+            id="chatMessages"
+        >
+
+            <div class="msg system">
+                🎬 Плеер инициализируется. Приятного просмотра!
+            </div>
+
+        </div>
+
+
+        <div class="chat-input-box">
+
+            <input
+                type="text"
+                class="message-input"
+                id="messageInput"
+                placeholder="Написать сообщение..."
+                autocomplete="off"
+            >
+
+            <button
+                class="send-btn"
+                id="sendBtn"
+                onclick="sendMessage()"
+            >
+                Отпр.
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     SEARCH OVERLAY
+========================================================== -->
+
+<div
+    class="search-overlay"
+    id="searchOverlay"
+>
+
+    <div class="search-header">
+
+        <input
+            type="text"
+            class="search-input"
+            id="searchInput"
+            placeholder="Название фильма или сериала..."
+            autocomplete="off"
+        >
+
+        <button
+            class="search-close"
+            onclick="closeSearch()"
+        >
+            ✕
+        </button>
+
+    </div>
+
+
+    <div
+        class="search-results"
+        id="searchResults"
+    >
+
+        <div class="search-empty">
+            Введи название фильма
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     TOAST
+========================================================== -->
+
+<div
+    class="toast"
+    id="toast"
+></div>
+
+
+<script>
+
+"use strict";
+
+
+/* ============================================================
+   CONFIGURATION
+============================================================ */
+
+/*
+    ВАЖНО:
+
+    Сюда поставь URL твоего Python/FastAPI сервера.
+
+    Например:
+
+    https://my-movie-api.onrender.com
+
+    БЕЗ "/" в конце.
+*/
+
+const API_BASE = "https://YOUR-BACKEND-DOMAIN.com";
+
+
+/*
+    Telegram bot username.
+*/
+
+const BOT_USERNAME = "kinopoiskov1k_bot";
+
+
+/* ============================================================
+   TELEGRAM
+============================================================ */
+
+const tg = window.Telegram.WebApp;
+
+tg.ready();
+
+tg.expand();
+
+try {
+
+    tg.setHeaderColor("#0f0f0f");
+
+    tg.setBackgroundColor("#0f0f0f");
+
+} catch (e) {
+
+    console.log("Telegram theme API:", e);
+
+}
+
+
+/* ============================================================
+   URL PARAMETERS
+============================================================ */
+
+const urlParams =
+    new URLSearchParams(
+        window.location.search
+    );
+
+
+const kpId =
+    urlParams.get("kp_id");
+
+
+const mode =
+    urlParams.get("mode") || "solo";
+
+
+const roomId =
+    urlParams.get("room");
+
+
+/* ============================================================
+   STATE
+============================================================ */
+
+let currentUser = null;
+
+let userName = "Зритель";
+
+let socket = null;
+
+let socketReconnectTimer = null;
+
+let reconnectAttempts = 0;
+
+let isClosingSocket = false;
+
+let currentMovieId = kpId;
+
+let currentRoomId = roomId;
+
+let playerReady = false;
+
+let remotePlayerAction = false;
+
+
+/* ============================================================
+   DOM
+============================================================ */
+
+const chatMessages =
+    document.getElementById(
+        "chatMessages"
+    );
+
+
+const messageInput =
+    document.getElementById(
+        "messageInput"
+    );
+
+
+const sendBtn =
+    document.getElementById(
+        "sendBtn"
+    );
+
+
+const roomStatus =
+    document.getElementById(
+        "roomStatus"
+    );
+
+
+const roomTitle =
+    document.getElementById(
+        "roomTitle"
+    );
+
+
+const inviteBtn =
+    document.getElementById(
+        "inviteBtn"
+    );
+
+
+const playerLoading =
+    document.getElementById(
+        "playerLoading"
+    );
+
+
+const searchOverlay =
+    document.getElementById(
+        "searchOverlay"
+    );
+
+
+const searchInput =
+    document.getElementById(
+        "searchInput"
+    );
+
+
+const searchResults =
+    document.getElementById(
+        "searchResults"
+    );
+
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+function showToast(text) {
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+    toast.textContent = text;
+
+    toast.classList.add("show");
+
+    setTimeout(() => {
+
+        toast.classList.remove("show");
+
+    }, 2500);
+}
+
+
+function addSystemMessage(text) {
+
+    const div =
+        document.createElement("div");
+
+    div.className =
+        "msg system";
+
+    div.textContent =
+        text;
+
+    chatMessages.appendChild(div);
+
+    scrollChat();
+}
+
+
+function addChatMessage(
+    username,
+    text,
+    isMine = false
+) {
+
+    const div =
+        document.createElement("div");
+
+    div.className =
+        "msg" +
+        (isMine ? " mine" : "");
+
+    const userSpan =
+        document.createElement("span");
+
+    userSpan.className =
+        "msg-user";
+
+    userSpan.textContent =
+        username + ":";
+
+    div.appendChild(userSpan);
+
+    const textSpan =
+        document.createElement("span");
+
+    textSpan.textContent =
+        " " + text;
+
+    div.appendChild(textSpan);
+
+    chatMessages.appendChild(div);
+
+    scrollChat();
+}
+
+
+function scrollChat() {
+
+    chatMessages.scrollTop =
+        chatMessages.scrollHeight;
+}
+
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+/* ============================================================
+   TELEGRAM AUTHENTICATION
+============================================================ */
+
+async function authenticateTelegram() {
+
+    /*
+        Если backend URL ещё не установлен,
+        не ломаем сам Mini App.
+    */
+
+    if (
+        !API_BASE ||
+        API_BASE.includes(
+            "YOUR-BACKEND-DOMAIN"
+        )
+    ) {
+
+        console.warn(
+            "API_BASE is not configured"
+        );
+
+        currentUser = (
+            tg.initDataUnsafe &&
+            tg.initDataUnsafe.user
+        ) || null;
+
+        if (currentUser) {
+
+            userName =
+                currentUser.first_name ||
+                currentUser.username ||
+                "Зритель";
+        }
+
+        return true;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE}/api/auth`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        initData:
+                            tg.initData
+                    })
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
+        }
+
+
+        const result =
+            await response.json();
+
+
+        if (
+            !result.ok ||
+            !result.user
+        ) {
+
+            throw new Error(
+                "Invalid auth response"
+            );
+        }
+
+
+        currentUser =
+            result.user;
+
+
+        userName =
+            currentUser.first_name ||
+            currentUser.username ||
+            "Зритель";
+
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "Telegram auth error:",
+            error
+        );
+
+        /*
+            Не блокируем приложение.
+            Пользователь всё равно сможет
+            пользоваться плеером.
+        */
+
+        currentUser = (
+            tg.initDataUnsafe &&
+            tg.initDataUnsafe.user
+        ) || null;
+
+
+        if (currentUser) {
+
+            userName =
+                currentUser.first_name ||
+                currentUser.username ||
+                "Зритель";
+        }
+
+        return false;
+    }
+}
+
+
+/* ============================================================
+   KINOBOX PLAYER
+============================================================ */
+
+function initializePlayer(movieId) {
+
+    if (!movieId) {
+
+        playerLoading.classList.add(
+            "hidden"
+        );
+
+        addSystemMessage(
+            "⚠️ Фильм не выбран."
+        );
+
+        return;
+    }
+
+
+    playerLoading.classList.remove(
+        "hidden"
+    );
+
+
+    const container =
+        document.getElementById(
+            "kinoboxPlayer"
+        );
+
+
+    container.innerHTML = "";
+
+
+    try {
+
+        /*
+            Используем официальный API kbox().
+        */
+
+        if (
+            typeof window.kbox !==
+            "function"
+        ) {
+
+            throw new Error(
+                "Kinobox script is not loaded"
+            );
+        }
+
+
+        window.kbox(
+            "#kinoboxPlayer",
+            {
+
+                search: {
+                    kinopoisk:
+                        String(movieId)
+                },
+
+                menu: {
+
+                    enable: true,
+
+                    open: false,
+
+                    limit: 5
+                },
+
+                notFoundMessage:
+                    "Видео для этого фильма не найдено.",
+
+                players: {
+
+                    collaps: {
+                        enable: true
+                    },
+
+                    kodik: {
+                        enable: true
+                    },
+
+                    videocdn: {
+                        enable: true
+                    }
+
+                },
+
+                events: {
+
+                    playerLoaded:
+                        function(
+                            status,
+                            sources
+                        ) {
+
+                            console.log(
+                                "Kinobox loaded:",
+                                status,
+                                sources
+                            );
+
+                            playerReady =
+                                true;
+
+                            playerLoading
+                                .classList
+                                .add(
+                                    "hidden"
+                                );
+
+                            addSystemMessage(
+                                "🟢 Плеер готов"
+                            );
+                        }
+                }
+            }
+        );
+
+
+        /*
+            Дополнительное официальное событие Kinobox.
+        */
+
+        document.addEventListener(
+            "KinoboxPlayerLoaded",
+            function(event) {
+
+                console.log(
+                    "KinoboxPlayerLoaded:",
+                    event.detail
+                );
+
+                playerReady =
+                    true;
+
+                playerLoading
+                    .classList
+                    .add(
+                        "hidden"
+                    );
+            },
+            {
+                once: true
+            }
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Kinobox error:",
+            error
+        );
+
+
+        playerLoading
+            .classList
+            .add(
+                "hidden"
+            );
+
+
+        addSystemMessage(
+            "❌ Не удалось загрузить видеоплеер."
+        );
+
+        showToast(
+            "Ошибка загрузки плеера"
+        );
+    }
+}
+
+
+/* ============================================================
+   SEARCH
+============================================================ */
+
+function openSearch() {
+
+    searchOverlay.classList.add(
+        "active"
+    );
+
+    searchInput.focus();
+}
+
+
+function closeSearch() {
+
+    searchOverlay.classList.remove(
+        "active"
+    );
+}
+
+
+let searchTimer = null;
+
+
+searchInput.addEventListener(
+    "input",
+    function() {
+
+        clearTimeout(
+            searchTimer
+        );
+
+
+        const query =
+            searchInput.value.trim();
+
+
+        if (!query) {
+
+            searchResults.innerHTML =
+                `
+                <div class="search-empty">
+                    Введи название фильма
+                </div>
+                `;
+
+            return;
+        }
+
+
+        searchTimer =
+            setTimeout(
+                () => {
+
+                    searchMovies(query);
+
+                },
+                400
+            );
+    }
+);
+
+
+async function searchMovies(query) {
+
+    searchResults.innerHTML =
+        `
+        <div class="search-empty">
+            🔍 Поиск...
+        </div>
+        `;
+
+
+    if (
+        !API_BASE ||
+        API_BASE.includes(
+            "YOUR-BACKEND-DOMAIN"
+        )
+    ) {
+
+        searchResults.innerHTML =
+            `
+            <div class="search-empty">
+                ⚠️ Не указан API_BASE
+            </div>
+            `;
+
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE}/api/search?q=` +
+                encodeURIComponent(query)
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const items =
+            data.items || [];
+
+
+        renderSearchResults(
+            items
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Search error:",
+            error
+        );
+
+
+        searchResults.innerHTML =
+            `
+            <div class="search-empty">
+                ❌ Ошибка поиска.<br>
+                Проверь подключение к серверу.
+            </div>
+            `;
+    }
+}
+
+
+function renderSearchResults(
+    items
+) {
+
+    if (!items.length) {
+
+        searchResults.innerHTML =
+            `
+            <div class="search-empty">
+                ❌ Ничего не найдено
+            </div>
+            `;
+
+        return;
+    }
+
+
+    searchResults.innerHTML = "";
+
+
+    items.forEach(
+        function(movie) {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "movie-card";
+
+
+            const poster =
+                document.createElement(
+                    "img"
+                );
+
+            poster.className =
+                "movie-poster";
+
+            poster.alt =
+                movie.title || "";
+
+
+            if (movie.poster) {
+
+                poster.src =
+                    movie.poster;
+
+            } else {
+
+                poster.style.display =
+                    "none";
+            }
+
+
+            const info =
+                document.createElement(
+                    "div"
+                );
+
+            info.className =
+                "movie-info";
+
+
+            const title =
+                document.createElement(
+                    "div"
+                );
+
+            title.className =
+                "movie-title";
+
+            title.textContent =
+                movie.title ||
+                "Без названия";
+
+
+            const year =
+                document.createElement(
+                    "div"
+                );
+
+            year.className =
+                "movie-year";
+
+            year.textContent =
+                movie.year ||
+                "Год неизвестен";
+
+
+            info.appendChild(
+                title
+            );
+
+            info.appendChild(
+                year
+            );
+
+
+            card.appendChild(
+                poster
+            );
+
+            card.appendChild(
+                info
+            );
+
+
+            card.onclick =
+                function() {
+
+                    selectMovie(
+                        movie.id,
+                        movie.title
+                    );
+                };
+
+
+            searchResults.appendChild(
+                card
+            );
+
+        }
+    );
+}
+
+
+/* ============================================================
+   SELECT MOVIE
+============================================================ */
+
+function selectMovie(
+    movieId,
+    title
+) {
+
+    currentMovieId =
+        String(movieId);
+
+
+    closeSearch();
+
+
+    roomTitle.textContent =
+        "🎬 " +
+        (
+            title ||
+            "Кинотеатр"
+        );
+
+
+    initializePlayer(
+        currentMovieId
+    );
+
+
+    /*
+        Если это уже комната друзей,
+        сообщаем участникам,
+        что фильм изменён.
+    */
+
+    if (
+        mode === "friends" &&
+        socket &&
+        socket.readyState ===
+            WebSocket.OPEN
+    ) {
+
+        socket.send(
+            JSON.stringify({
+
+                type:
+                    "movie",
+
+                movie_id:
+                    currentMovieId,
+
+                title:
+                    title || "Фильм"
+
+            })
+        );
+    }
+}
+
+
+/* ============================================================
+   WATCH PARTY
+============================================================ */
+
+function setRoomStatus(
+    text,
+    state
+) {
+
+    roomStatus.textContent =
+        text;
+
+
+    roomStatus.className =
+        "room-status";
+
+
+    if (state) {
+
+        roomStatus.classList.add(
+            state
+        );
+    }
+}
+
+
+function connectRoom() {
+
+    if (
+        mode !== "friends" ||
+        !currentRoomId
+    ) {
+
+        return;
+    }
+
+
+    if (
+        !API_BASE ||
+        API_BASE.includes(
+            "YOUR-BACKEND-DOMAIN"
+        )
+    ) {
+
+        setRoomStatus(
+            "⚠️ Backend не настроен",
+            "offline"
+        );
+
+        addSystemMessage(
+            "⚠️ Укажи API_BASE в index.html"
+        );
+
+        return;
+    }
+
+
+    setRoomStatus(
+        "🟡 Подключение...",
+        "connecting"
+    );
+
+
+    const wsProtocol =
+        API_BASE.startsWith(
+            "https://"
+        )
+            ? "wss://"
+            : "ws://";
+
+
+    const backendHost =
+        API_BASE
+            .replace(
+                /^https?:\/\//,
+                ""
+            )
+            .replace(
+                /\/$/,
+                ""
+            );
+
+
+    const wsUrl =
+        `${wsProtocol}${backendHost}` +
+        `/ws/rooms/${encodeURIComponent(
+            currentRoomId
+        )}`;
+
+
+    console.log(
+        "Connecting WebSocket:",
+        wsUrl
+    );
+
+
+    try {
+
+        socket =
+            new WebSocket(
+                wsUrl
+            );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        scheduleReconnect();
+
+        return;
+    }
+
+
+    socket.onopen =
+        function() {
+
+            reconnectAttempts = 0;
+
+
+            setRoomStatus(
+                `🟢 Комната ${currentRoomId}`,
+                ""
+            );
+
+
+            sendBtn.disabled =
+                false;
+
+
+            addSystemMessage(
+                "🟢 Соединение с комнатой установлено"
+            );
+
+
+            /*
+                Регистрируем пользователя.
+            */
+
+            socket.send(
+                JSON.stringify({
+
+                    type:
+                        "join",
+
+                    user_id:
+                        currentUser
+                            ? currentUser.id
+                            : null,
+
+                    user:
+                        userName,
+
+                    movie_id:
+                        currentMovieId
+
+                })
+            );
+        };
+
+
+    socket.onmessage =
+        function(event) {
+
+            try {
+
+                const data =
+                    JSON.parse(
+                        event.data
+                    );
+
+
+                handleRoomMessage(
+                    data
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "WebSocket message error:",
+                    error
+                );
+            }
+        };
+
+
+    socket.onerror =
+        function(error) {
+
+            console.error(
+                "WebSocket error:",
+                error
+            );
+
+            setRoomStatus(
+                "🔴 Ошибка соединения",
+                "offline"
+            );
+        };
+
+
+    socket.onclose =
+        function() {
+
+            socket = null;
+
+
+            sendBtn.disabled =
+                true;
+
+
+            if (
+                isClosingSocket
+            ) {
+
+                return;
+            }
+
+
+            setRoomStatus(
+                "🔴 Соединение потеряно",
+                "offline"
+            );
+
+
+            scheduleReconnect();
+        };
+}
+
+
+/* ============================================================
+   RECONNECT
+============================================================ */
+
+function scheduleReconnect() {
+
+    if (
+        socketReconnectTimer
+    ) {
+
+        return;
+    }
+
+
+    reconnectAttempts++;
+
+
+    const delay =
+        Math.min(
+            1000 *
+            Math.pow(
+                2,
+                reconnectAttempts
+            ),
+            15000
+        );
+
+
+    socketReconnectTimer =
+        setTimeout(
+            function() {
+
+                socketReconnectTimer =
+                    null;
+
+                connectRoom();
+
+            },
+            delay
+        );
+}
+
+
+/* ============================================================
+   ROOM MESSAGES
+============================================================ */
+
+function handleRoomMessage(
+    data
+) {
+
+    console.log(
+        "ROOM:",
+        data
+    );
+
+
+    switch (
+        data.type
+    ) {
+
+        case "connected":
+
+            break;
+
+
+        case "joined":
+
+            if (
+                data.message
+            ) {
+
+                addSystemMessage(
+                    data.message
+                );
+            }
+
+            break;
+
+
+        case "system":
+
+            addSystemMessage(
+                data.text ||
+                "Системное сообщение"
+            );
+
+            break;
+
+
+        case "chat":
+
+            addChatMessage(
+                data.user ||
+                "Зритель",
+
+                data.text ||
+                "",
+
+                false
+            );
+
+            break;
+
+
+        case "movie":
+
+            if (
+                data.movie_id
+            ) {
+
+                currentMovieId =
+                    String(
+                        data.movie_id
+                    );
+
+
+                roomTitle.textContent =
+                    "🎬 " +
+                    (
+                        data.title ||
+                        "Кинотеатр"
+                    );
+
+
+                /*
+                    Не перезагружаем автоматически
+                    у отправителя.
+                */
+
+                if (
+                    data.sender !==
+                    getUserId()
+                ) {
+
+                    initializePlayer(
+                        currentMovieId
+                    );
+                }
+            }
+
+            break;
+
+
+        case "player":
+
+            handleRemotePlayer(
+                data
+            );
+
+            break;
+
+
+        case "room_state":
+
+            /*
+                Сервер может прислать
+                текущее состояние комнаты.
+            */
+
+            if (
+                data.movie_id
+            ) {
+
+                currentMovieId =
+                    String(
+                        data.movie_id
+                    );
+            }
+
+            break;
+
+
+        case "user_joined":
+
+            addSystemMessage(
+                `👋 ${
+                    data.user ||
+                    "Пользователь"
+                } вошёл в комнату`
+            );
+
+            break;
+
+
+        case "user_left":
+
+            addSystemMessage(
+                `👋 ${
+                    data.user ||
+                    "Пользователь"
+                } вышел из комнаты`
+            );
+
+            break;
+
+
+        default:
+
+            console.log(
+                "Unknown room message:",
+                data
+            );
+    }
+}
+
+
+/* ============================================================
+   SEND CHAT
+============================================================ */
+
+function sendMessage() {
+
+    const text =
+        messageInput.value.trim();
+
+
+    if (!text) {
+
+        return;
+    }
+
+
+    /*
+        Одиночный режим:
+
+        сообщение показываем локально.
+    */
+
+    if (
+        mode !== "friends"
+    ) {
+
+        addChatMessage(
+            userName,
+            text,
+            true
+        );
+
+        messageInput.value =
+            "";
+
+        return;
+    }
+
+
+    /*
+        Комната друзей.
+    */
+
+    if (
+        !socket ||
+        socket.readyState !==
+            WebSocket.OPEN
+    ) {
+
+        showToast(
+            "Нет соединения с комнатой"
+        );
+
+        return;
+    }
+
+
+    socket.send(
+        JSON.stringify({
+
+            type:
+                "chat",
+
+            user:
+                userName,
+
+            user_id:
+                getUserId(),
+
+            text:
+                text
+        })
+    );
+
+
+    /*
+        Сервер вернёт сообщение
+        обратно всем участникам.
+    */
+
+    messageInput.value =
+        "";
+}
+
+
+/* ============================================================
+   ENTER TO SEND
+============================================================ */
+
+messageInput.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key ===
+            "Enter"
+        ) {
+
+            event.preventDefault();
+
+            sendMessage();
+        }
+    }
+);
+
+
+/* ============================================================
+   USER ID
+============================================================ */
+
+function getUserId() {
+
+    if (
+        currentUser &&
+        currentUser.id
+    ) {
+
+        return String(
+            currentUser.id
+        );
+    }
+
+
+    return "guest_" +
+        Math.random()
+            .toString(36)
+            .substring(2, 10);
+}
+
+
+/* ============================================================
+   PLAYER SYNCHRONIZATION
+============================================================ */
+
+/*
+    ВАЖНО:
+
+    Kinobox использует iframe стороннего
+    видеобалансера.
+
+    Поэтому мы НЕ пытаемся обращаться:
+
+        iframe.contentWindow.document
+
+    Это запрещено Same-Origin Policy.
+
+    Мы слушаем postMessage от плееров,
+    если конкретный балансер его поддерживает.
+*/
+
+
+window.addEventListener(
+    "message",
+    function(event) {
+
+        if (!event.data) {
+
+            return;
+        }
+
+
+        console.log(
+            "PLAYER MESSAGE:",
+            event.data
+        );
+
+
+        /*
+            Универсальная попытка распознать
+            тип события.
+
+            Разные балансеры могут использовать
+            разные форматы.
+        */
+
+        let type =
+            event.data.type ||
+            event.data.event ||
+            event.data.action;
+
+
+        let time =
+            event.data.time ??
+            event.data.currentTime ??
+            event.data.position;
+
+
+        if (
+            typeof type !==
+            "string"
+        ) {
+
+            return;
+        }
+
+
+        type =
+            type.toLowerCase();
+
+
+        if (
+            type === "play" ||
+            type === "playing"
+        ) {
+
+            sendPlayerState(
+                "play",
+                time
+            );
+
+            return;
+        }
+
+
+        if (
+            type === "pause" ||
+            type === "paused"
+        ) {
+
+            sendPlayerState(
+                "pause",
+                time
+            );
+
+            return;
+        }
+
+
+        if (
+            type === "seek" ||
+            type === "userseek"
+        ) {
+
+            sendPlayerState(
+                "seek",
+                time
+            );
+
+            return;
+        }
+
+
+        if (
+            type === "time"
+        ) {
+
+            /*
+                Периодическую синхронизацию
+                не отправляем слишком часто.
+            */
+
+            return;
+        }
+    }
+);
+
+
+/* ============================================================
+   SEND PLAYER STATE
+============================================================ */
+
+function sendPlayerState(
+    action,
+    time
+) {
+
+    if (
+        remotePlayerAction
+    ) {
+
+        return;
+    }
+
+
+    if (
+        mode !== "friends"
+    ) {
+
+        return;
+    }
+
+
+    if (
+        !socket ||
+        socket.readyState !==
+            WebSocket.OPEN
+    ) {
+
+        return;
+    }
+
+
+    const numericTime =
+        Number(time);
+
+
+    socket.send(
+        JSON.stringify({
+
+            type:
+                "player",
+
+            action:
+                action,
+
+            time:
+                Number.isFinite(
+                    numericTime
+                )
+                    ? numericTime
+                    : 0,
+
+            sender:
+                getUserId()
+        })
+    );
+}
+
+
+/* ============================================================
+   REMOTE PLAYER
+============================================================ */
+
+/*
+    Здесь отправляем команды обратно
+    iframe через postMessage.
+
+    Это сработает только если выбранный
+    видеобалансер поддерживает соответствующие
+    postMessage-команды.
+
+    Мы специально НЕ ломаем плеер,
+    если балансер их не поддерживает.
+*/
+
+function handleRemotePlayer(
+    data
+) {
+
+    if (
+        !data ||
+        data.sender ===
+            getUserId()
+    ) {
+
+        return;
+    }
+
+
+    const iframe =
+        document.querySelector(
+            ".kinobox_player iframe"
+        );
+
+
+    if (!iframe) {
+
+        return;
+    }
+
+
+    remotePlayerAction =
+        true;
+
+
+    try {
+
+        const action =
+            data.action;
+
+
+        const time =
+            Number(
+                data.time || 0
+            );
+
+
+        /*
+            Универсальный формат команды.
+        */
+
+        iframe.contentWindow.postMessage(
+            {
+                type:
+                    action,
+
+                action:
+                    action,
+
+                time:
+                    time,
+
+                currentTime:
+                    time
+            },
+            "*"
+        );
+
+
+        /*
+            Некоторые плееры используют
+            API команды.
+        */
+
+        iframe.contentWindow.postMessage(
+            {
+                event:
+                    action,
+
+                value:
+                    time
+            },
+            "*"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Remote player error:",
+            error
+        );
+
+    } finally {
+
+        setTimeout(
+            function() {
+
+                remotePlayerAction =
+                    false;
+
+            },
+            500
+        );
+    }
+}
+
+
+/* ============================================================
+   PERIODIC WATCH PARTY SYNC
+============================================================ */
+
+setInterval(
+    function() {
+
+        if (
+            mode !== "friends"
+        ) {
+
+            return;
+        }
+
+
+        if (
+            !socket ||
+            socket.readyState !==
+                WebSocket.OPEN
+        ) {
+
+            return;
+        }
+
+
+        /*
+            Kinobox не предоставляет
+            единый currentTime API для всех
+            балансеров, поэтому здесь отправляем
+            heartbeat комнаты.
+
+            Если конкретный iframe присылает
+            time через postMessage, его можно
+            использовать.
+        */
+
+        socket.send(
+            JSON.stringify({
+
+                type:
+                    "heartbeat",
+
+                user_id:
+                    getUserId(),
+
+                movie_id:
+                    currentMovieId
+            })
+        );
+
+
+    },
+    5000
+);
+
+
+/* ============================================================
+   INVITE FRIEND
+============================================================ */
+
+function inviteFriend() {
+
+    if (
+        !currentRoomId
+    ) {
+
+        showToast(
+            "Комната ещё не создана"
+        );
+
+        return;
+    }
+
+
+    const startParam =
+        `room_${currentRoomId}_${currentMovieId}`;
+
+
+    const botUrl =
+        `https://t.me/` +
+        BOT_USERNAME +
+        `?start=` +
+        encodeURIComponent(
+            startParam
+        );
+
+
+    const shareUrl =
+        `https://t.me/share/url?url=` +
+        encodeURIComponent(
+            botUrl
+        ) +
+        `&text=` +
+        encodeURIComponent(
+            "🍿 Заходи! Будем смотреть фильм вместе!"
+        );
+
+
+    try {
+
+        if (
+            tg.openTelegramLink
+        ) {
+
+            tg.openTelegramLink(
+                shareUrl
+            );
+
+        } else {
+
+            window.open(
+                shareUrl,
+                "_blank"
+            );
+        }
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        window.open(
+            shareUrl,
+            "_blank"
+        );
+    }
+}
+
+
+/* ============================================================
+   BACK BUTTON
+============================================================ */
+
+try {
+
+    tg.BackButton.onClick(
+        function() {
+
+            if (
+                searchOverlay.classList.contains(
+                    "active"
+                )
+            ) {
+
+                closeSearch();
+
+                return;
+            }
+
+
+            tg.close();
+        }
+    );
+
+} catch (error) {
+
+    console.log(
+        "Telegram BackButton unavailable"
+    );
+}
+
+
+/* ============================================================
+   INITIALIZATION
+============================================================ */
+
+async function initApp() {
+
+    console.log(
+        "Starting Mini App..."
+    );
+
+
+    /*
+        Telegram auth.
+    */
+
+    await authenticateTelegram();
+
+
+    console.log(
+        "User:",
+        currentUser
+    );
+
+
+    /*
+        Room UI.
+    */
+
+    if (
+        mode === "friends" &&
+        currentRoomId
+    ) {
+
+        roomTitle.textContent =
+            "🍿 Совместный просмотр";
+
+
+        setRoomStatus(
+            `🟡 Комната ${currentRoomId}`,
+            "connecting"
+        );
+
+
+        inviteBtn.style.display =
+            "block";
+
+
+        addSystemMessage(
+            `🍿 Совместный просмотр: ${currentRoomId}`
+        );
+
+    } else {
+
+        roomTitle.textContent =
+            "🎬 Одиночный просмотр";
+
+
+        setRoomStatus(
+            "Одиночный просмотр",
+            ""
+        );
+    }
+
+
+    /*
+        Player.
+    */
+
+    initializePlayer(
+        currentMovieId
+    );
+
+
+    /*
+        WebSocket.
+    */
+
+    if (
+        mode === "friends" &&
+        currentRoomId
+    ) {
+
+        connectRoom();
+    }
+
+
+    console.log(
+        "Mini App initialized."
+    );
+}
+
+
+/* ============================================================
+   START
+============================================================ */
+
+initApp();
+
+</script>
+
+</body>
+</html>
