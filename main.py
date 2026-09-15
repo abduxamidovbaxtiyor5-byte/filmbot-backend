@@ -26,6 +26,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
     CallbackQuery,
+    Update,
 )
 
 
@@ -469,6 +470,24 @@ async def health():
         "rooms": len(rooms),
         "time": time.time(),
     }
+
+
+# ============================================================
+# TELEGRAM WEBHOOK ENDPOINT (Added for Render deployment)
+# ============================================================
+
+@app.post("/webhook")
+async def telegram_webhook(update: dict):
+    """
+    Принимает входящие обновления от Telegram через Webhook
+    и передает их в диспетчер aiogram.
+    """
+    try:
+        telegram_update = Update.model_validate(update, context={"bot": bot})
+        await dp.feed_update(bot, telegram_update)
+    except Exception as e:
+        logger.exception("Ошибка обработки вебхука: %s", e)
+    return {"status": "ok"}
 
 
 @app.get("/api/room/{room_id}")
@@ -1105,10 +1124,6 @@ async def websocket_room(
                 )
 
                 room.updated_at = time.time()
-
-                # Не надо отправлять каждый timeupdate
-                # абсолютно всем каждую миллисекунду.
-                # Отправляем только по запросу sync.
                 continue
 
             # ------------------------------------------------
@@ -1336,7 +1351,7 @@ async def room_cleanup_loop():
 
 
 # ============================================================
-# TELEGRAM KEYBOARD
+# TELEGRAM KEYBOARD & HANDLERS
 # ============================================================
 
 def get_main_keyboard():
@@ -1353,20 +1368,12 @@ def get_main_keyboard():
     )
 
 
-# ============================================================
-# /START
-# ============================================================
-
 @dp.message(Command("start"))
 async def cmd_start(
     message: types.Message,
 ):
 
     args = message.text.split()
-
-    # --------------------------------------------------------
-    # Приглашение в комнату
-    # --------------------------------------------------------
 
     if (
         len(args) > 1
@@ -1428,10 +1435,6 @@ async def cmd_start(
 
             return
 
-    # --------------------------------------------------------
-    # Обычный /start
-    # --------------------------------------------------------
-
     await message.answer(
         (
             "🎬 <b>Привет!</b>\n\n"
@@ -1442,10 +1445,6 @@ async def cmd_start(
         parse_mode="HTML",
     )
 
-
-# ============================================================
-# SEARCH BUTTON
-# ============================================================
 
 @dp.message(
     F.text == "🔍 Поискать другой фильм"
@@ -1460,10 +1459,6 @@ async def restart_search(
     )
 
 
-# ============================================================
-# MOVIE SEARCH
-# ============================================================
-
 @dp.message(F.text)
 async def search_movie(
     message: types.Message,
@@ -1477,10 +1472,6 @@ async def search_movie(
     if query.startswith("/"):
         return
 
-    # --------------------------------------------------------
-    # Показываем пользователю, что идет поиск
-    # --------------------------------------------------------
-
     searching_message = await message.answer(
         "🔎 Ищу фильм..."
     )
@@ -1489,20 +1480,12 @@ async def search_movie(
         query
     )
 
-    # --------------------------------------------------------
-    # Удаляем сообщение "Ищу..."
-    # --------------------------------------------------------
-
     try:
 
         await searching_message.delete()
 
     except Exception:
         pass
-
-    # --------------------------------------------------------
-    # Ничего не найдено
-    # --------------------------------------------------------
 
     if not films:
 
@@ -1514,26 +1497,17 @@ async def search_movie(
 
         return
 
-    # --------------------------------------------------------
-    # Формируем кнопки
-    # --------------------------------------------------------
-
     keyboard_buttons = []
 
     for film in films[:10]:
 
         film_id = film["id"]
-
         name = film["name"]
-
         year = film["year"]
 
         button_text = (
             f"{name} ({year})"
-        )
-
-        # Telegram ограничивает длину текста
-        button_text = button_text[:60]
+        )[:60]
 
         keyboard_buttons.append(
             [
@@ -1561,10 +1535,6 @@ async def search_movie(
     )
 
 
-# ============================================================
-# SELECT FILM
-# ============================================================
-
 @dp.callback_query(
     F.data.startswith("sel_film:")
 )
@@ -1591,25 +1561,13 @@ async def select_view_mode(
 
         return
 
-    # --------------------------------------------------------
-    # Создаем комнату
-    # --------------------------------------------------------
-
     room_id = create_room_id()
-
-    # --------------------------------------------------------
-    # Solo
-    # --------------------------------------------------------
 
     solo_url = (
         f"{NETLIFY_URL}/"
         f"?kp_id={film_id}"
         f"&mode=solo"
     )
-
-    # --------------------------------------------------------
-    # Friends
-    # --------------------------------------------------------
 
     friends_url = (
         f"{NETLIFY_URL}/"
@@ -1652,108 +1610,25 @@ async def select_view_mode(
 
 
 # ============================================================
-# SERVER + BOT STARTUP
-# ============================================================
-
-async def start_web_server():
-
-    config = uvicorn.Config(
-        app,
-        host="0.0.0.0",
-        port=PORT,
-        log_level="info",
-    )
-
-    server = uvicorn.Server(
-        config
-    )
-
-    await server.serve()
-
-
-async def main():
-
-    logger.info(
-        "======================================"
-    )
-
-    logger.info(
-        "Starting Kinopoisk Telegram Bot"
-    )
-
-    logger.info(
-        "Mini App URL: %s",
-        NETLIFY_URL,
-    )
-
-    logger.info(
-        "API port: %s",
-        PORT,
-    )
-
-    logger.info(
-        "======================================"
-    )
-
-    cleanup_task = asyncio.create_task(
-        room_cleanup_loop()
-    )
-
-    web_task = asyncio.create_task(
-        start_web_server()
-    )
-
-    bot_task = asyncio.create_task(
-        dp.start_polling(
-            bot,
-            allowed_updates=dp.resolve_used_update_types(),
-        )
-    )
-
-    try:
-
-        await asyncio.gather(
-            web_task,
-            bot_task,
-        )
-
-    except asyncio.CancelledError:
-
-        logger.info(
-            "Shutdown requested."
-        )
-
-    finally:
-
-        cleanup_task.cancel()
-
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
-
-        await bot.session.close()
-
-        logger.info(
-            "Bot stopped."
-        )
-
-
-# ============================================================
-# ENTRY POINT
+# ENTRY POINT (Fixed for Uvicorn / Webhook integration)
 # ============================================================
 
 if __name__ == "__main__":
-
     try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(room_cleanup_loop())
+        
+        logger.info("======================================")
+        logger.info("Starting Kinopoisk Telegram Bot Server")
+        logger.info("Mini App URL: %s", NETLIFY_URL)
+        logger.info("API port: %s", PORT)
+        logger.info("======================================")
 
-        asyncio.run(
-            main()
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=PORT,
         )
 
     except KeyboardInterrupt:
-
-        logger.info(
-            "Stopped by user."
-        )
-
+        logger.info("Stopped by user.")
