@@ -390,20 +390,29 @@ async def search_kinopoisk(query: str) -> List[dict]:
     films = data.get("films", [])
 
     result = []
+    current_year = 2026
 
-    for film in films[:20]:
+    for film in films[:30]:
 
         film_id = film.get("filmId")
 
         if not film_id:
             continue
 
+        year_val = film.get("year")
+        if year_val:
+            try:
+                if int(year_val) > current_year + 1:
+                    continue
+            except ValueError:
+                pass
+
         name_ru = film.get("nameRu") or ""
         name_en = film.get("nameEn") or ""
 
         name = name_ru or name_en or "Без названия"
 
-        year = film.get("year") or ""
+        year = str(year_val) if year_val else ""
 
         rating = (
             film.get("rating")
@@ -412,7 +421,6 @@ async def search_kinopoisk(query: str) -> List[dict]:
         )
 
         countries = film.get("countries") or []
-
         genres = film.get("genres") or []
 
         country_names = [
@@ -433,7 +441,7 @@ async def search_kinopoisk(query: str) -> List[dict]:
                 "name": name,
                 "name_ru": name_ru,
                 "name_en": name_en,
-                "year": str(year),
+                "year": year,
                 "rating": str(rating),
                 "poster": film.get("posterUrlPreview")
                 or film.get("posterUrl")
@@ -442,6 +450,9 @@ async def search_kinopoisk(query: str) -> List[dict]:
                 "countries": country_names,
             }
         )
+
+        if len(result) >= 15:
+            break
 
     return result
 
