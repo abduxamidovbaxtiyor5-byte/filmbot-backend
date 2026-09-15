@@ -53,6 +53,7 @@ NETLIFY_URL = os.getenv(
     "https://kinopoiskov1k.netlify.app",
 )
 
+# Автоматически подтягиваем WEBHOOK_URL из Render или используем дефолт
 WEBHOOK_URL = os.getenv(
     "WEBHOOK_URL",
     "https://filmbot-backend.onrender.com/webhook",
@@ -327,7 +328,7 @@ def room_state_payload(room: RoomState) -> dict:
 
 
 # ============================================================
-# KINOPOISK SEARCH
+# KINOPOISK SEARCH (С фильтрацией фильмов из будущего)
 # ============================================================
 
 async def search_kinopoisk(query: str) -> List[dict]:
@@ -388,26 +389,35 @@ async def search_kinopoisk(query: str) -> List[dict]:
         return []
 
     films = data.get("films", [])
-
     result = []
-    current_year = 2026
+    
+    # Автоматически берем текущий год (сейчас 2026), чтобы отсеивать анонсы из будущего
+    import datetime
+    current_year = datetime.datetime.now().year
 
     for film in films[:30]:
-
-        film_id = film.get("filmId")
+        film_id = film.get("filmId") or film.get("id")
 
         if not film_id:
             continue
 
         year_val = film.get("year")
+        is_future = False
         if year_val:
             try:
-                if int(year_val) > current_year + 1:
-                    continue
+                clean_year = "".join(filter(str.isdigit, str(year_val)[:4]))
+                if clean_year:
+                    movie_year = int(clean_year)
+                    # Отсеиваем фильмы, которые выходят позже, чем через 1 год
+                    if movie_year > current_year + 1:
+                        is_future = True
             except ValueError:
                 pass
 
-        name_ru = film.get("nameRu") or ""
+        if is_future:
+            continue
+
+        name_ru = film.get("nameRu") or film.get("name") or ""
         name_en = film.get("nameEn") or ""
 
         name = name_ru or name_en or "Без названия"
@@ -1862,3 +1872,10 @@ async def select_film_handler(
 logger.info(
     "FilmBot main.py загружен."
 )
+@app.post("/api/auth")
+async def api_auth(data: dict):
+    init_data = data.get("initData", "")
+    if not validate_init_data(init_data):
+        raise HTTPException(status_code=401, detail="Invalid initData")
+    user = get_user_from_init_data(init_data)
+    return {"ok": True, "user": user}
