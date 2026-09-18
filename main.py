@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 from urllib.parse import parse_qsl
 
 import aiohttp
+import uvicorn
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,10 +54,10 @@ NETLIFY_URL = os.getenv(
     "https://kinopoiskov1k.netlify.app",
 )
 
-# Автоматически подтягиваем WEBHOOK_URL из Render или используем дефолт
+# Автоматически подтягиваем WEBHOOK_URL из окружения или используем актуальный домен Railway
 WEBHOOK_URL = os.getenv(
     "WEBHOOK_URL",
-    "https://filmbot-backend.onrender.com/webhook",
+    "https://filmbot-backend-production.up.railway.app/webhook",
 )
 
 MAX_ROOM_USERS = 20
@@ -70,12 +71,12 @@ EMPTY_ROOM_LIFETIME = 3600
 
 if not BOT_TOKEN:
     raise RuntimeError(
-        "BOT_TOKEN не найден. Добавь BOT_TOKEN в Environment Variables Render."
+        "BOT_TOKEN не найден. Добавь BOT_TOKEN в Environment Variables Railway."
     )
 
 if not KP_API_TOKEN:
     raise RuntimeError(
-        "KP_API_TOKEN не найден. Добавь KP_API_TOKEN в Environment Variables Render."
+        "KP_API_TOKEN не найден. Добавь KP_API_TOKEN в Environment Variables Railway."
     )
 
 
@@ -391,7 +392,6 @@ async def search_kinopoisk(query: str) -> List[dict]:
     films = data.get("films", [])
     result = []
     
-    # Автоматически берем текущий год (сейчас 2026), чтобы отсеивать анонсы из будущего
     import datetime
     current_year = datetime.datetime.now().year
 
@@ -408,7 +408,6 @@ async def search_kinopoisk(query: str) -> List[dict]:
                 clean_year = "".join(filter(str.isdigit, str(year_val)[:4]))
                 if clean_year:
                     movie_year = int(clean_year)
-                    # Отсеиваем фильмы, которые выходят позже, чем через 1 год
                     if movie_year > current_year + 1:
                         is_future = True
             except ValueError:
@@ -1866,12 +1865,9 @@ async def select_film_handler(
 
 
 # ============================================================
-# STARTUP LOGGING
+# AUTH API
 # ============================================================
 
-logger.info(
-    "FilmBot main.py загружен."
-)
 @app.post("/api/auth")
 async def api_auth(data: dict):
     init_data = data.get("initData", "")
@@ -1879,3 +1875,12 @@ async def api_auth(data: dict):
         raise HTTPException(status_code=401, detail="Invalid initData")
     user = get_user_from_init_data(init_data)
     return {"ok": True, "user": user}
+
+
+# ============================================================
+# MAIN ENTRYPOINT (Динмический порт для Railway)
+# ============================================================
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
