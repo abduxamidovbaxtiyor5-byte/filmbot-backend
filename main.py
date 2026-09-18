@@ -60,8 +60,8 @@ WEBHOOK_URL = os.getenv(
     "https://filmbot-backend-production.up.railway.app/webhook",
 )
 
-MAX_ROOM_USERS = 20
-USER_TIMEOUT = 60
+MAX_ROOM_USERS = 50
+USER_TIMEOUT = 240
 MAX_MESSAGE_LENGTH = 500
 MAX_CHAT_MESSAGES = 100
 
