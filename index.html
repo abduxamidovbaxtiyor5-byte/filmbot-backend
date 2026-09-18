@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ru">
 
@@ -196,9 +195,9 @@
         ===================================================== */
 
         .room-header {
-            height: 48px;
+            height: 52px;
 
-            padding: 7px 10px;
+            padding: 6px 10px;
 
             display: flex;
 
@@ -222,6 +221,7 @@
             flex-direction: column;
 
             gap: 2px;
+            flex: 1;
         }
 
         .room-title {
@@ -236,6 +236,12 @@
             text-overflow: ellipsis;
         }
 
+        .room-status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .room-status {
             font-size: 10px;
 
@@ -248,6 +254,14 @@
 
         .room-status.connecting {
             color: #facc15;
+        }
+
+        .room-users-count {
+            font-size: 10px;
+            color: #9ca3af;
+            background: #252525;
+            padding: 1px 6px;
+            border-radius: 4px;
         }
 
         .invite-btn {
@@ -706,11 +720,20 @@
                 🎬 Кинотеатр
             </div>
 
-            <div
-                class="room-status"
-                id="roomStatus"
-            >
-                Одиночный просмотр
+            <div class="room-status-row">
+                <div
+                    class="room-status"
+                    id="roomStatus"
+                >
+                    Одиночный просмотр
+                </div>
+                <div
+                    class="room-users-count"
+                    id="roomUsersCount"
+                    style="display:none;"
+                >
+                    👥 1 в комнате
+                </div>
             </div>
 
         </div>
@@ -833,7 +856,7 @@
 ============================================================ */
 
 const API_BASE =
-    "https://filmbot-backend.onrender.com";
+    "https://filmbot-backend.up.railway.app";
 
 const BOT_USERNAME =
     "kinopoiskov1k_bot";
@@ -937,6 +960,8 @@ let playerLoadTimeout = null;
 
 let lastPlayerEventTime = 0;
 
+let isRoomController = false; // Флаг прав хоста (создателя комнаты)
+
 
 /* ============================================================
    DOM
@@ -963,6 +988,11 @@ const sendBtn =
 const roomStatus =
     document.getElementById(
         "roomStatus"
+    );
+
+const roomUsersCount =
+    document.getElementById(
+        "roomUsersCount"
     );
 
 
@@ -1283,19 +1313,6 @@ function loadTelegramUser() {
 }
 
 
-/* ============================================================
-   TELEGRAM AUTHENTICATION
-============================================================ */
-
-/*
-    В текущем Render backend нет /api/auth.
-
-    Поэтому frontend НЕ делает несуществующий запрос.
-
-    Для WebSocket передаём tg.initData,
-    а backend самостоятельно проверяет его.
-*/
-
 async function authenticateTelegram() {
 
     loadTelegramUser();
@@ -1503,10 +1520,6 @@ function initializeDirectIframe(
 
             hidePlayerLoading();
 
-            addSystemMessage(
-                "🟢 KinoBox загружен"
-            );
-
             console.log(
                 "KinoBox iframe loaded:",
                 iframe.src
@@ -1527,10 +1540,6 @@ function initializeDirectIframe(
                 "KinoBox не удалось загрузить."
             );
 
-            addSystemMessage(
-                "❌ Ошибка загрузки KinoBox"
-            );
-
         }
     );
 
@@ -1548,16 +1557,8 @@ function initializeDirectIframe(
                     !playerReady
                 ) {
 
-                    console.warn(
-                        "KinoBox iframe load timeout"
-                    );
-
                     showPlayerError(
                         "Плеер слишком долго загружается."
-                    );
-
-                    addSystemMessage(
-                        "⚠️ KinoBox долго не отвечает"
                     );
                 }
 
@@ -1605,12 +1606,6 @@ async function initializeKinoboxJs(
 
     try {
 
-        console.log(
-            "Запуск kinobox():",
-            movieId
-        );
-
-
         kinobox(
             "#kinoboxPlayer",
             {
@@ -1621,13 +1616,7 @@ async function initializeKinoboxJs(
             }
         );
 
-
     } catch (error) {
-
-        console.error(
-            "Kinobox initialization error:",
-            error
-        );
 
         return false;
     }
@@ -1643,10 +1632,6 @@ async function initializeKinoboxJs(
         !iframe
     ) {
 
-        console.warn(
-            "kinobox() не создал iframe"
-        );
-
         return false;
     }
 
@@ -1654,12 +1639,6 @@ async function initializeKinoboxJs(
     playerIframe =
         iframe;
 
-
-    /*
-        iframe load означает, что embed-документ
-        загрузился. Это не гарантирует, что конкретный
-        видеобалансир уже начал воспроизведение.
-    */
 
     iframe.addEventListener(
         "load",
@@ -1670,25 +1649,12 @@ async function initializeKinoboxJs(
 
             hidePlayerLoading();
 
-            addSystemMessage(
-                "🟢 Плеер KinoBox загружен"
-            );
-
-            console.log(
-                "KinoBox iframe loaded"
-            );
-
         },
         {
             once: true
         }
     );
 
-
-    /*
-        Если iframe уже загрузился к моменту
-        установки обработчика.
-    */
 
     if (
         iframe.contentWindow
@@ -1705,10 +1671,6 @@ async function initializeKinoboxJs(
                         true;
 
                     hidePlayerLoading();
-
-                    addSystemMessage(
-                        "🟢 Плеер KinoBox доступен"
-                    );
 
                 }
 
@@ -1746,10 +1708,6 @@ async function initializePlayer(
             "Фильм не выбран."
         );
 
-        addSystemMessage(
-            "⚠️ Фильм не выбран."
-        );
-
         return;
     }
 
@@ -1783,11 +1741,6 @@ async function initializePlayer(
 
     try {
 
-        /*
-            Сначала используем официальный
-            метод kinobox.js.
-        */
-
         const jsStarted =
             await initializeKinoboxJs(
                 currentMovieId
@@ -1798,23 +1751,8 @@ async function initializePlayer(
             jsStarted
         ) {
 
-            console.log(
-                "KinoBox запущен через kinobox.js"
-            );
-
             return;
         }
-
-
-        /*
-            Если kinobox.js не смог создать
-            плеер — используем документированный
-            iframe embed.
-        */
-
-        console.warn(
-            "kinobox.js не сработал. Используем iframe."
-        );
 
 
         initializeDirectIframe(
@@ -1823,16 +1761,6 @@ async function initializePlayer(
 
     } catch (error) {
 
-        console.error(
-            "Player initialization error:",
-            error
-        );
-
-
-        /*
-            Последний fallback — iframe.
-        */
-
         try {
 
             initializeDirectIframe(
@@ -1840,11 +1768,6 @@ async function initializePlayer(
             );
 
         } catch (fallbackError) {
-
-            console.error(
-                "Player fallback error:",
-                fallbackError
-            );
 
             showPlayerError(
                 "Не удалось запустить плеер."
@@ -1927,10 +1850,6 @@ searchInput.addEventListener(
 );
 
 
-/* ============================================================
-   SEARCH MOVIES
-============================================================ */
-
 async function searchMovies(
     query
 ) {
@@ -1970,39 +1889,21 @@ async function searchMovies(
             await response.json();
 
 
-        const items =
-            data.results ||
-            data.items ||
-            [];
-
-
         renderSearchResults(
-            items
+            data.results || []
         );
-
 
     } catch (error) {
-
-        console.error(
-            "Search error:",
-            error
-        );
-
 
         searchResults.innerHTML =
             `
             <div class="search-empty">
-                ❌ Ошибка поиска.<br>
-                Проверь подключение к серверу.
+                ❌ Ошибка поиска.
             </div>
             `;
     }
 }
 
-
-/* ============================================================
-   RENDER SEARCH RESULTS
-============================================================ */
 
 function renderSearchResults(
     items
@@ -2139,10 +2040,6 @@ function renderSearchResults(
 }
 
 
-/* ============================================================
-   SELECT MOVIE
-============================================================ */
-
 function selectMovie(
     movieId,
     title
@@ -2151,10 +2048,6 @@ function selectMovie(
     if (
         !movieId
     ) {
-
-        showToast(
-            "У фильма нет ID"
-        );
 
         return;
     }
@@ -2178,37 +2071,11 @@ function selectMovie(
     initializePlayer(
         currentMovieId
     );
-
-
-    /*
-        В текущем backend нет обработчика
-        message type "movie".
-
-        Поэтому не отправляем несуществующую
-        команду на Render.
-    */
-
-
-    if (
-        mode === "friends" &&
-        socket &&
-        socket.readyState ===
-            WebSocket.OPEN
-    ) {
-
-        addSystemMessage(
-            "🎬 Выбран фильм: " +
-            (
-                title ||
-                currentMovieId
-            )
-        );
-    }
 }
 
 
 /* ============================================================
-   ROOM STATUS
+   ROOM STATUS & PARTICIPANTS
 ============================================================ */
 
 function setRoomStatus(
@@ -2235,8 +2102,22 @@ function setRoomStatus(
 }
 
 
+function updateRoomUsers(usersList) {
+    if (!usersList || !usersList.length) {
+        roomUsersCount.style.display = "none";
+        return;
+    }
+
+    roomUsersCount.style.display = "inline-block";
+    roomUsersCount.textContent = `👥 ${usersList.length} в комнате`;
+    
+    const names = usersList.map(u => u.name).join(", ");
+    roomUsersCount.title = `В комнате: ${names}`;
+}
+
+
 /* ============================================================
-   WEBSOCKET URL
+   WEBSOCKET URL & CONNECTION
 ============================================================ */
 
 function getWebSocketUrl(
@@ -2267,10 +2148,6 @@ function getWebSocketUrl(
     );
 }
 
-
-/* ============================================================
-   CONNECT ROOM
-============================================================ */
 
 function connectRoom() {
 
@@ -2309,12 +2186,6 @@ function connectRoom() {
         );
 
 
-    console.log(
-        "Connecting WebSocket:",
-        wsUrl
-    );
-
-
     try {
 
         socket =
@@ -2323,11 +2194,6 @@ function connectRoom() {
             );
 
     } catch (error) {
-
-        console.error(
-            "WebSocket creation error:",
-            error
-        );
 
         setRoomStatus(
             "🔴 Ошибка соединения",
@@ -2357,11 +2223,6 @@ function connectRoom() {
                 false;
 
 
-            addSystemMessage(
-                "🟢 Соединение с комнатой установлено"
-            );
-
-
             const joinMessage = {
                 type: "join",
 
@@ -2381,18 +2242,6 @@ function connectRoom() {
                 name:
                     userName
             };
-
-
-            console.log(
-                "Joining room:",
-                {
-                    room:
-                        currentRoomId,
-
-                    kp_id:
-                        currentMovieId
-                }
-            );
 
 
             socket.send(
@@ -2419,23 +2268,12 @@ function connectRoom() {
                 );
 
             } catch (error) {
-
-                console.error(
-                    "WebSocket message error:",
-                    error
-                );
             }
         };
 
 
     socket.onerror =
         function(error) {
-
-            console.error(
-                "WebSocket error:",
-                error
-            );
-
 
             setRoomStatus(
                 "🔴 Ошибка соединения",
@@ -2446,13 +2284,6 @@ function connectRoom() {
 
     socket.onclose =
         function(event) {
-
-            console.log(
-                "WebSocket closed:",
-                event.code,
-                event.reason
-            );
-
 
             socket =
                 null;
@@ -2480,10 +2311,6 @@ function connectRoom() {
         };
 }
 
-
-/* ============================================================
-   RECONNECT
-============================================================ */
 
 function scheduleReconnect() {
 
@@ -2518,12 +2345,6 @@ function scheduleReconnect() {
         );
 
 
-    console.log(
-        "WebSocket reconnect in:",
-        delay
-    );
-
-
     socketReconnectTimer =
         setTimeout(
             function() {
@@ -2548,12 +2369,6 @@ function handleRoomMessage(
     data
 ) {
 
-    console.log(
-        "ROOM:",
-        data
-    );
-
-
     switch (
         data.type
     ) {
@@ -2563,12 +2378,6 @@ function handleRoomMessage(
             if (
                 data.room
             ) {
-
-                /*
-                    Если комната сообщает фильм,
-                    которого ещё нет локально.
-                */
-
                 if (
                     data.room.kp_id &&
                     !currentMovieId
@@ -2585,56 +2394,19 @@ function handleRoomMessage(
                     );
                 }
 
+                const myId = getUserId();
+                isRoomController = (data.room.controller_id === myId);
 
-                /*
-                    Сохраняем состояние комнаты.
-                */
+                if (isRoomController) {
+                    roomTitle.textContent = "🍿 Совместный просмотр (Вы управляете)";
+                } else {
+                    roomTitle.textContent = "🍿 Совместный просмотр";
+                }
 
-                if (
-                    typeof data.room.position ===
-                    "number"
-                ) {
-
-                    console.log(
-                        "Room position:",
-                        data.room.position
-                    );
+                if (data.room.users) {
+                    updateRoomUsers(data.room.users);
                 }
             }
-
-            break;
-
-
-        case "user_joined":
-
-            addSystemMessage(
-                "👋 " +
-                (
-                    data.user &&
-                    data.user.name
-                        ? data.user.name
-                        : "Пользователь"
-                ) +
-                " вошёл в комнату"
-            );
-
-            break;
-
-
-        case "user_left":
-
-            addSystemMessage(
-                "👋 Пользователь вышел из комнаты"
-            );
-
-            break;
-
-
-        case "user_name_changed":
-
-            addSystemMessage(
-                "✏️ Пользователь изменил имя"
-            );
 
             break;
 
@@ -2680,12 +2452,6 @@ function handleRoomMessage(
 
         case "error":
 
-            console.error(
-                "Room error:",
-                data.message
-            );
-
-
             addSystemMessage(
                 "❌ " +
                 (
@@ -2695,14 +2461,6 @@ function handleRoomMessage(
             );
 
             break;
-
-
-        default:
-
-            console.log(
-                "Unknown room message:",
-                data
-            );
     }
 }
 
@@ -2795,36 +2553,15 @@ messageInput.addEventListener(
 
 
 /* ============================================================
-   PLAYER EVENTS
+   PLAYER EVENTS (Только для создателя комнаты)
 ============================================================ */
-
-/*
-    Важно:
-
-    KinoBox агрегирует сторонние iframe-плееры.
-    Мы НЕ предполагаем, что каждый источник
-    поддерживает управление через postMessage.
-
-    Поэтому эти обработчики работают как
-    best-effort механизм:
-
-    если конкретный iframe отправит play/pause/seek,
-    мы можем передать состояние в комнату.
-
-    Если источник не отправляет такие события,
-    приложение не ломается.
-*/
-
 
 window.addEventListener(
     "message",
     function(event) {
 
-        if (
-            !event.data
-        ) {
-
-            return;
+        if (!event.data || !isRoomController) {
+            return; // Обычные зрители не шлют команды плеера на сервер
         }
 
 
@@ -2921,10 +2658,6 @@ window.addEventListener(
 );
 
 
-/* ============================================================
-   SEND PLAYER STATE
-============================================================ */
-
 function sendPlayerState(
     action,
     time
@@ -2980,10 +2713,6 @@ function sendPlayerState(
 }
 
 
-/* ============================================================
-   REMOTE PLAYER CONTROL
-============================================================ */
-
 function handleRemotePlayer(
     data
 ) {
@@ -2996,11 +2725,6 @@ function handleRemotePlayer(
     if (
         !iframe
     ) {
-
-        console.log(
-            "Remote player event received, but iframe not ready:",
-            data
-        );
 
         return;
     }
@@ -3015,14 +2739,6 @@ function handleRemotePlayer(
             data.position || 0
         );
 
-
-    /*
-        Это best-effort управление.
-
-        Мы не считаем, что конкретный
-        сторонний источник обязательно
-        поддерживает postMessage.
-    */
 
     remotePlayerAction =
         true;
@@ -3050,13 +2766,7 @@ function handleRemotePlayer(
             "*"
         );
 
-
     } catch (error) {
-
-        console.error(
-            "Remote player postMessage error:",
-            error
-        );
 
     } finally {
 
@@ -3091,66 +2801,62 @@ function inviteFriend() {
     }
 
 
-    const startParam =
-        "room_" +
-        currentRoomId +
-        "_" +
-        currentMovieId;
+    (function() {
+        const startParam =
+            "room_" +
+            currentRoomId +
+            "_" +
+            currentMovieId;
 
 
-    const botUrl =
-        "https://t.me/" +
-        BOT_USERNAME +
-        "?start=" +
-        encodeURIComponent(
-            startParam
-        );
-
-
-    const shareUrl =
-        "https://t.me/share/url?url=" +
-        encodeURIComponent(
-            botUrl
-        ) +
-        "&text=" +
-        encodeURIComponent(
-            "🍿 Заходи! Будем смотреть фильм вместе!"
-        );
-
-
-    try {
-
-        if (
-            tg &&
-            typeof tg.openTelegramLink ===
-                "function"
-        ) {
-
-            tg.openTelegramLink(
-                shareUrl
+        const botUrl =
+            "https://t.me/" +
+            BOT_USERNAME +
+            "?start=" +
+            encodeURIComponent(
+                startParam
             );
 
-        } else {
+
+        const shareUrl =
+            "https://t.me/share/url?url=" +
+            encodeURIComponent(
+                botUrl
+            ) +
+            "&text=" +
+            encodeURIComponent(
+                "🍿 Заходи! Будем смотреть фильм вместе!"
+            );
+
+
+        try {
+
+            if (
+                tg &&
+                typeof tg.openTelegramLink ===
+                    "function"
+            ) {
+
+                tg.openTelegramLink(
+                    shareUrl
+                );
+
+            } else {
+
+                window.open(
+                    shareUrl,
+                    "_blank"
+                );
+            }
+
+        } catch (error) {
 
             window.open(
                 shareUrl,
                 "_blank"
             );
         }
-
-    } catch (error) {
-
-        console.error(
-            "Invite error:",
-            error
-        );
-
-
-        window.open(
-            shareUrl,
-            "_blank"
-        );
-    }
+    })();
 }
 
 
@@ -3160,54 +2866,8 @@ function inviteFriend() {
 
 async function initApp() {
 
-    console.log(
-        "===================================="
-    );
-
-    console.log(
-        "Starting FilmBot Mini App..."
-    );
-
-    console.log(
-        "API:",
-        API_BASE
-    );
-
-    console.log(
-        "KP ID:",
-        currentMovieId
-    );
-
-    console.log(
-        "Mode:",
-        mode
-    );
-
-    console.log(
-        "Room:",
-        currentRoomId
-    );
-
-    console.log(
-        "Kinobox function:",
-        typeof window.kinobox
-    );
-
-    console.log(
-        "===================================="
-    );
-
-
-    /* --------------------------------------------------------
-       TELEGRAM USER
-    -------------------------------------------------------- */
-
     await authenticateTelegram();
 
-
-    /* --------------------------------------------------------
-       ROOM UI
-    -------------------------------------------------------- */
 
     if (
         mode === "friends" &&
@@ -3227,13 +2887,6 @@ async function initApp() {
         inviteBtn.style.display =
             "block";
 
-
-        addSystemMessage(
-            "🍿 Совместный просмотр: " +
-            currentRoomId
-        );
-
-
     } else {
 
         roomTitle.textContent =
@@ -3246,10 +2899,6 @@ async function initApp() {
         );
     }
 
-
-    /* --------------------------------------------------------
-       PLAYER
-    -------------------------------------------------------- */
 
     if (
         currentMovieId
@@ -3264,16 +2913,8 @@ async function initApp() {
         showPlayerError(
             "Фильм не выбран."
         );
-
-        addSystemMessage(
-            "⚠️ Открой фильм через Telegram-бота."
-        );
     }
 
-
-    /* --------------------------------------------------------
-       WEBSOCKET
-    -------------------------------------------------------- */
 
     if (
         mode === "friends" &&
@@ -3282,17 +2923,8 @@ async function initApp() {
 
         connectRoom();
     }
-
-
-    console.log(
-        "Mini App initialized."
-    );
 }
 
-
-/* ============================================================
-   CLEANUP
-============================================================ */
 
 window.addEventListener(
     "beforeunload",
@@ -3311,10 +2943,6 @@ window.addEventListener(
                 socket.close();
 
             } catch (error) {
-
-                console.error(
-                    error
-                );
             }
         }
 
@@ -3331,14 +2959,9 @@ window.addEventListener(
 );
 
 
-/* ============================================================
-   START
-============================================================ */
-
 initApp();
 
 </script>
 
 </body>
 </html>
-```
