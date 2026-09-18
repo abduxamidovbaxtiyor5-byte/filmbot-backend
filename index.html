@@ -913,7 +913,7 @@ const kpId =
 
 
 const mode =
-    urlParams.get("mode") || "solo";
+    urlParams.get("mode") || (urlParams.get("room") ? "friends" : "solo");
 
 
 const roomId =
@@ -960,7 +960,7 @@ let playerLoadTimeout = null;
 
 let lastPlayerEventTime = 0;
 
-let isRoomController = false; // Флаг прав хоста (создателя комнаты)
+let isRoomController = false; // Флаг прав хоста
 
 
 /* ============================================================
@@ -1519,11 +1519,6 @@ function initializeDirectIframe(
             );
 
             hidePlayerLoading();
-
-            console.log(
-                "KinoBox iframe loaded:",
-                iframe.src
-            );
 
         }
     );
@@ -2151,11 +2146,7 @@ function getWebSocketUrl(
 
 function connectRoom() {
 
-    if (
-        mode !== "friends" ||
-        !currentRoomId
-    ) {
-
+    if (!currentRoomId) {
         return;
     }
 
@@ -2322,11 +2313,7 @@ function scheduleReconnect() {
     }
 
 
-    if (
-        mode !== "friends" ||
-        !currentRoomId
-    ) {
-
+    if (!currentRoomId) {
         return;
     }
 
@@ -2362,7 +2349,7 @@ function scheduleReconnect() {
 
 
 /* ============================================================
-   ROOM MESSAGES
+   ROOM MESSAGES & SYNC POSITION FOR LATECOMERS
 ============================================================ */
 
 function handleRoomMessage(
@@ -2405,6 +2392,11 @@ function handleRoomMessage(
 
                 if (data.room.users) {
                     updateRoomUsers(data.room.users);
+                }
+
+                // СИНХРОНИЗАЦИЯ ДЛЯ ОПОЗДАВШИХ: если плеер уже готов, перематываем на текущую позицию комнаты
+                if (typeof data.room.position === "number" && data.room.position > 2) {
+                    handleRemotePlayer({ type: "seek", position: data.room.position });
                 }
             }
 
@@ -2484,7 +2476,7 @@ function sendMessage() {
 
 
     if (
-        mode !== "friends"
+        !currentRoomId
     ) {
 
         addChatMessage(
@@ -2671,10 +2663,7 @@ function sendPlayerState(
     }
 
 
-    if (
-        mode !== "friends"
-    ) {
-
+    if (!currentRoomId) {
         return;
     }
 
@@ -2870,7 +2859,6 @@ async function initApp() {
 
 
     if (
-        mode === "friends" &&
         currentRoomId
     ) {
 
@@ -2917,7 +2905,6 @@ async function initApp() {
 
 
     if (
-        mode === "friends" &&
         currentRoomId
     ) {
 
