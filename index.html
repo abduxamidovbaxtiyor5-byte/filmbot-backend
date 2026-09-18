@@ -913,11 +913,13 @@ const kpId =
 
 
 const mode =
-    urlParams.get("mode") || (urlParams.get("room") ? "friends" : "solo");
-
+    urlParams.get("mode") || "solo";
 
 const roomId =
     urlParams.get("room");
+
+// Если в URL есть room, принудительно включаем режим friends
+const activeMode = roomId ? "friends" : mode;
 
 
 /* ============================================================
@@ -2261,6 +2263,55 @@ function connectRoom() {
             } catch (error) {
             }
         };
+    function handleRoomMessage(data) {
+    switch (data.type) {
+        case "room_state":
+            if (data.room) {
+                if (data.room.kp_id && typeof currentMovieId !== "undefined" && !currentMovieId) {
+                    currentMovieId = String(data.room.kp_id);
+                    initializePlayer(currentMovieId);
+                }
+                const myId = typeof getUserId === "function" ? getUserId() : "";
+                isRoomController = (data.room.controller_id === myId);
+
+                if (typeof roomTitle !== "undefined" && roomTitle) {
+                    roomTitle.textContent = isRoomController ? "🍿 Совместный просмотр (Вы управляете)" : "🍿 Совместный просмотр";
+                }
+                if (data.room.users && typeof updateRoomUsers === "function") {
+                    updateRoomUsers(data.room.users);
+                }
+                // Синхронизация для опоздавших
+                if (typeof data.room.position === "number" && data.room.position > 2 && typeof handleRemotePlayer === "function") {
+                    handleRemotePlayer({ type: "seek", position: data.room.position });
+                }
+            }
+            break;
+
+        case "chat":
+            if (data.message && typeof addChatMessage === "function") {
+                addChatMessage(
+                    data.message.name || "Зритель",
+                    data.message.message || "",
+                    data.message.user_id === (typeof getUserId === "function" ? getUserId() : "")
+                );
+            }
+            break;
+
+        case "play":
+        case "pause":
+        case "seek":
+            if (typeof handleRemotePlayer === "function") {
+                handleRemotePlayer(data);
+            }
+            break;
+
+        case "error":
+            if (typeof addSystemMessage === "function") {
+                addSystemMessage("❌ " + (data.message || "Ошибка комнаты"));
+            }
+            break;
+    }
+}
 
 
     socket.onerror =
