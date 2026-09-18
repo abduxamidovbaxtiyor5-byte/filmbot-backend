@@ -902,27 +902,51 @@ if (tg) {
    URL PARAMETERS
 ============================================================ */
 
-const urlParams = new URLSearchParams(window.location.search);
-let kpId = urlParams.get("kp_id");
-let mode = urlParams.get("mode") || "solo";
-let roomId = urlParams.get("room");
+const urlParams =
+    new URLSearchParams(
+        window.location.search
+    );
 
-// Если открыто через кнопку бота со ссылкой вида start=room_ID_KPID
-if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
-    const startParam = window.Telegram.WebApp.initDataUnsafe.start_param;
-    if (startParam.startsWith("room_")) {
-        const parts = startParam.replace("room_", "").split("_");
-        if (parts[0]) roomId = parts[0];
-        if (parts[1]) kpId = parts[1];
-    }
-}
 
-// Если в URL или start_param есть room, принудительно включаем режим friends
+const kpId =
+    urlParams.get("kp_id");
+
+
+const mode =
+    urlParams.get("mode") || "solo";
+
+const roomId =
+    urlParams.get("room");
+
+// Если в URL есть room, принудительно включаем режим friends
 const activeMode = roomId ? "friends" : mode;
 
-// Присваиваем значения глобальным переменным без повторного объявления let
-currentMovieId = kpId ? String(kpId) : null;
-currentRoomId = roomId ? String(roomId) : null;
+
+/* ============================================================
+   STATE
+============================================================ */
+
+let currentUser = null;
+
+let userName = "Зритель";
+
+let socket = null;
+
+let socketReconnectTimer = null;
+
+let reconnectAttempts = 0;
+
+let isClosingSocket = false;
+
+let currentMovieId =
+    kpId
+        ? String(kpId)
+        : null;
+
+let currentRoomId =
+    roomId
+        ? String(roomId)
+        : null;
 
 let playerReady = false;
 
